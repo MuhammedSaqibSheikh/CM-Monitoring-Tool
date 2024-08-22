@@ -1,0 +1,50 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Root>
+	<CM_Monitor>
+		<ServerDetails>
+			<Servers IP="10.52.90.27" Username="ZL7oC6+qAgImdNoxNLNYKAMvcJI1JGo9" Password="uBx/ir/VHPgwAW4bNhKkYQ=="></Servers>
+		</ServerDetails>
+		<Environments>
+			<Environment name="DEV">
+				<WorkgroupServers>
+					<Workgroup name="WGS1" prop="x" Installdir="" Logpath="">
+						<Services>
+							<service name="WGS" prop="TRIMWorkgroup" Server=""></service>
+							<service name="IDOL" prop="TRIMIDOLService" Server="10.52.90.27"></service>
+							<service name="IDOLContent" prop="TRIMIDOLContent" Server="10.52.90.27"></service>
+							<service name="ServiceAPIBulk" prop="TRIMServiceAPIBulkLoader" Server=""></service>
+							<service name="OnstreamDataprovider" prop="" Server=""></service>
+							<service name="EmailLinkService" prop="" Server=""></service>
+						</Services>
+						<LogPaths>
+							<Path name="WGSLogs" path="C:\Micro Focus Content Manager\ServerLocalData\TRIM\Log" lastupdated="2024-08-06 15:00:17,973"></Path>
+							<Path name="WebClientLogs" path="C:\Micro Focus Content Manager\WebClientWorkpath\Logs" lastupdated="2024-08-06 15:00:17,978"></Path>
+							<Path name="ServiceAPILogs" path="C:\Micro Focus Content Manager\ServiceAPIWorkpath\logs" lastupdated="2024-08-06 15:00:17,981"></Path>
+							<Path name="WebDrawerLogs" path="C:\Micro Focus Content Manager\WebDrawerWorkpath\logs" lastupdated="2024-08-06 15:00:17,984"></Path>
+							<Path name="LDAPLogs" path="C:\Micro Focus Content Manager\" lastupdated="2024-08-06 15:00:17,987"></Path>
+						</LogPaths>
+					</Workgroup>
+				</WorkgroupServers>
+				<Datasets>
+					<Dataset name="EE" id="TS">
+						<DbConnection servername="" creds=""></DbConnection>
+						<urls websitename="">
+							<url name="CMWeb" path="http://localhost/ContentManager"></url>
+							<url name="CMServiceAPI" path="http://localhost/CMServiceAPI"></url>
+							<url name="CMWebDrawer" path="http://localhost/CMWebDrawer"></url>
+						</urls>
+					</Dataset>
+				</Datasets>
+			</Environment>
+		</Environments>
+		<WindowsEvent>
+			<Services name="Trim" lastupdated="2024-08-06 12:59:23,584"></Services>
+			<Services name="Trim Event" lastupdated="2024-08-06 12:59:34,127"></Services>
+		</WindowsEvent>
+		<EmailSetup From="" Subject="" SmtpServer="" SmtpPort="" Enabled="False">
+			<Recipients To="msheikh2@opentext.com"></Recipients>
+			<Recipients To="skv2@opentext.com"></Recipients>
+			<Recipients To="rsaha2@opentext.com"></Recipients>
+		</EmailSetup>
+	</CM_Monitor>
+</Root>

@@ -1,0 +1,35 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34202.233
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XML_Parse", "XML_Parse\XML_Parse.csproj", "{83ED16A3-EFFF-4ADE-9695-0007CAEB36B7}"
+EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "CM Monitoring", "CM Monitoring\CM Monitoring.vdproj", "{6D37A5AC-6736-4715-9281-B8F31062CB87}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Encryption Module", "Encryption Module\Encryption Module.csproj", "{B0CF1805-EC7B-42DD-AE0D-2759424E12A5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{83ED16A3-EFFF-4ADE-9695-0007CAEB36B7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{83ED16A3-EFFF-4ADE-9695-0007CAEB36B7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{83ED16A3-EFFF-4ADE-9695-0007CAEB36B7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{83ED16A3-EFFF-4ADE-9695-0007CAEB36B7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6D37A5AC-6736-4715-9281-B8F31062CB87}.Debug|Any CPU.ActiveCfg = Debug
+		{6D37A5AC-6736-4715-9281-B8F31062CB87}.Release|Any CPU.ActiveCfg = Release
+		{B0CF1805-EC7B-42DD-AE0D-2759424E12A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0CF1805-EC7B-42DD-AE0D-2759424E12A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0CF1805-EC7B-42DD-AE0D-2759424E12A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0CF1805-EC7B-42DD-AE0D-2759424E12A5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EF83D316-B029-4019-BFBE-F45FA1B39500}
+	EndGlobalSection
+EndGlobal
