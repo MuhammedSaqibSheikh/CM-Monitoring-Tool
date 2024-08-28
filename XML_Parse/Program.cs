@@ -18,6 +18,7 @@ using System.Xml.Linq;
 using System.Management;
 using System.Threading;
 using System.Security.Cryptography;
+using System.Collections.Concurrent;
 
 namespace XML_Parse
 {
@@ -28,6 +29,13 @@ namespace XML_Parse
         public String ThreadId { get; set; }
         public String LogLevel { get; set; }
         public String ErrorMessage { get; set; }
+    }
+
+    class EventEntry
+    {
+        public String Event { get; set; }
+        public int Total { get; set; }
+        public int Processed { get; set; }
     }
 
     internal class Program
@@ -65,7 +73,7 @@ namespace XML_Parse
         }
 
         private static void LoadServerDetails()
-        {           
+        {
             foreach (XmlElement serverDetails in GetXML().SelectNodes("CM_Monitor/ServerDetails/Servers"))
             {
                 DTServer.Rows.Add(serverDetails.GetAttribute("IP"), serverDetails.GetAttribute("Username"), serverDetails.GetAttribute("Password"));
@@ -80,12 +88,12 @@ namespace XML_Parse
             {
                 int wgscount = 0;
                 int dscount = 0;
-                msgBuilder.Append("<tr><td rowspan=\"EnviCount\">" + environmentNode.GetAttribute("name") + "</td>");
-                log.Info($"Environment: {environmentNode.GetAttribute("name")}");
+                msgBuilder.Append("<tr><td rowspan=\"EnviCount\">" + environmentNode.GetAttribute("Name") + "</td>");
+                log.Info($"Environment: {environmentNode.GetAttribute("Name")}");
                 foreach (XmlElement workgroupNode in environmentNode.SelectNodes("WorkgroupServers/Workgroup"))
                 {
                     wgscount += 1;
-                    ProcessWorkgroup(workgroupNode, environmentNode.GetAttribute("name"));
+                    ProcessWorkgroup(workgroupNode, environmentNode.GetAttribute("Name"));
                 }
                 foreach (XmlElement datasetNode in environmentNode.SelectNodes("Datasets/Dataset"))
                 {
@@ -100,32 +108,40 @@ namespace XML_Parse
                 foreach (XmlElement servicesNode in windowsNode.SelectNodes("Services"))
                 {
                     DateTime lastUpdated = DateTime.Now.AddDays(-5);
-                    if (!string.IsNullOrEmpty(servicesNode.GetAttribute("lastupdated")))
+                    if (!string.IsNullOrEmpty(servicesNode.GetAttribute("LastUpdated")))
                     {
-                        lastUpdated = DateTime.ParseExact(servicesNode.GetAttribute("lastupdated"), "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                        lastUpdated = DateTime.ParseExact(servicesNode.GetAttribute("LastUpdated"), "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
                     }
-                    EventViewerLog("Application", servicesNode.GetAttribute("name"), lastUpdated);
+                    EventViewerLog("Application", servicesNode.GetAttribute("Name"), lastUpdated);
                 }
             }
             msgBuilder.Length -= 4;
-            msgBuilder.Append("</body></table>");
+            msgBuilder.Append("</body></table></br></br><table id='security' border='2'><tr><th>Dataset</th><th>Event Processor</th><th>Total Process</th><th>Processed</th><th>Queued</th></tr>");
+            foreach (XmlElement environmentNode in GetXML().SelectNodes("CM_Monitor/Environments/Environment"))
+            {
+                foreach (XmlElement datasetNode in environmentNode.SelectNodes("Datasets/Dataset"))
+                {
+                    EventProcessor(datasetNode.GetAttribute("Id"), datasetNode.GetAttribute("EventLogPath"), datasetNode.GetAttribute("LastUpdated"));
+                }
+            }
+            msgBuilder.Append("</table>");
         }
 
         private static void ProcessWorkgroup(XmlElement workgroupNode, string environmentName)
         {
-            msgBuilder.Append("<td rowspan=\"11\">" + workgroupNode.GetAttribute("name") + "</td><td rowspan=\"6\">CM Services</td>");
-            log.Info($"  Workgroup: {workgroupNode.GetAttribute("name")}, Prop: {workgroupNode.GetAttribute("prop")}");
+            msgBuilder.Append("<td rowspan=\"11\">" + workgroupNode.GetAttribute("Name") + "</td><td rowspan=\"6\">CM Services</td>");
+            log.Info($"  Workgroup: {workgroupNode.GetAttribute("Name")}, Prop: {workgroupNode.GetAttribute("Prop")}");
             foreach (XmlElement serviceNode in workgroupNode.SelectNodes("Services/service"))
             {
-                if (!string.IsNullOrEmpty(serviceNode.GetAttribute("prop")))
+                if (!string.IsNullOrEmpty(serviceNode.GetAttribute("Prop")))
                 {
                     if (string.IsNullOrEmpty(serviceNode.GetAttribute("Server")))
                     {
-                        CheckService(serviceNode.GetAttribute("prop"), serviceNode.GetAttribute("name"));
+                        CheckService(serviceNode.GetAttribute("Prop"), serviceNode.GetAttribute("Name"));
                     }
                     else
                     {
-                        CheckService(serviceNode.GetAttribute("Server"), serviceNode.GetAttribute("prop"), serviceNode.GetAttribute("name"));
+                        CheckService(serviceNode.GetAttribute("Server"), serviceNode.GetAttribute("Prop"), serviceNode.GetAttribute("Name"));
                     }
                 }
                 else
@@ -137,20 +153,20 @@ namespace XML_Parse
             msgBuilder.Append("<td rowspan=\"5\">CM Logs</td>");
             foreach (XmlElement logPathNode in workgroupNode.SelectNodes("LogPaths/Path"))
             {
-                if (!string.IsNullOrEmpty(logPathNode.GetAttribute("path")))
+                if (!string.IsNullOrEmpty(logPathNode.GetAttribute("Path")))
                 {
-                    switch (logPathNode.GetAttribute("name"))
+                    switch (logPathNode.GetAttribute("Name"))
                     {
                         case "WGSLogs":
-                            CheckWGSLogs(logPathNode.GetAttribute("path"), "WGSLogs", logPathNode.GetAttribute("lastupdated"), environmentName, workgroupNode.GetAttribute("name"));
+                            CheckWGSLogs(logPathNode.GetAttribute("Path"), "WGSLogs", logPathNode.GetAttribute("LastUpdated"), environmentName, workgroupNode.GetAttribute("Name"));
                             break;
                         case "ServiceAPILogs":
                         case "WebClientLogs":
                         case "WebDrawerLogs":
-                            CheckLogs(logPathNode.GetAttribute("path"), logPathNode.GetAttribute("name"), logPathNode.GetAttribute("lastupdated"), environmentName, workgroupNode.GetAttribute("name"));
+                            CheckLogs(logPathNode.GetAttribute("Path"), logPathNode.GetAttribute("Name"), logPathNode.GetAttribute("LastUpdated"), environmentName, workgroupNode.GetAttribute("Name"));
                             break;
                         case "LDAPLogs":
-                            CheckLDAPLogs(logPathNode.GetAttribute("path"), "LDAPLogs", logPathNode.GetAttribute("lastupdated"), environmentName, workgroupNode.GetAttribute("name"));
+                            CheckLDAPLogs(logPathNode.GetAttribute("Path"), "LDAPLogs", logPathNode.GetAttribute("LastUpdated"), environmentName, workgroupNode.GetAttribute("Name"));
                             break;
                         default:
                             msgBuilder.Append("</tr><tr>");
@@ -162,22 +178,22 @@ namespace XML_Parse
 
         private static void ProcessDataset(XmlElement datasetNode)
         {
-            msgBuilder.Append("<td rowspan=\"3\">" + datasetNode.GetAttribute("name") + " : " + datasetNode.GetAttribute("id") + "</td>");
-            log.Info($"  Dataset: {datasetNode.GetAttribute("name")}, ID: {datasetNode.GetAttribute("id")}");
+            msgBuilder.Append("<td rowspan=\"3\">" + datasetNode.GetAttribute("Name") + " : " + datasetNode.GetAttribute("Id") + "</td>");
+            log.Info($"  Dataset: {datasetNode.GetAttribute("Name")}, ID: {datasetNode.GetAttribute("Id")}");
             foreach (XmlElement urlNode in datasetNode.SelectNodes("urls/url"))
             {
-                if (!string.IsNullOrEmpty(urlNode.GetAttribute("path")))
+                if (!string.IsNullOrEmpty(urlNode.GetAttribute("Path")))
                 {
-                    switch (urlNode.GetAttribute("name"))
+                    switch (urlNode.GetAttribute("Name"))
                     {
                         case "CMWeb":
-                            CheckWebClient(urlNode.GetAttribute("path"), "Web Client");
+                            CheckWebClient(urlNode.GetAttribute("Path"), "Web Client");
                             break;
                         case "CMServiceAPI":
-                            CheckWebClient(urlNode.GetAttribute("path"), "Service API");
+                            CheckWebClient(urlNode.GetAttribute("Path"), "Service API");
                             break;
                         case "CMWebDrawer":
-                            CheckWebClient(urlNode.GetAttribute("path"), "Web Drawer");
+                            CheckWebClient(urlNode.GetAttribute("Path"), "Web Drawer");
                             break;
                         default:
                             msgBuilder.Append("</tr><tr>");
@@ -617,8 +633,8 @@ namespace XML_Parse
                 String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
                 msgBuilder.Append("<td></td><td></td><td>Event Viewer Logs</td><td>" + sourceName + "</td><td>Windows Event Logs</td><td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + lastdate.ToString("dd-MM-yyyy HH:mm:ss.fff") + "</td></tr><tr>");
                 XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
-                var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("WindowsEvent").Elements("Services").Where(e => e.Attribute("name").Value == sourceName).Single();
-                target.Attribute("lastupdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
+                var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("WindowsEvent").Elements("Services").Where(e => e.Attribute("Name").Value == sourceName).Single();
+                target.Attribute("LastUpdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
                 xmlDoc.Save("CM_Monitor.xml");
                 UpdateXML("", "", "", rows, dt);
             }
@@ -723,6 +739,76 @@ namespace XML_Parse
             }
         }
 
+        static public void EventProcessor(String Dataset, String LogPath, String time)
+        {
+            try
+            {
+                DateTime last = DateTime.Now;
+                DirectoryInfo folder = new DirectoryInfo(LogPath);
+                var files = folder.GetFiles().Where(file => file.LastWriteTime < last && file.Name.StartsWith("TRIMEvent_" + Dataset + "_"));
+                if (!String.IsNullOrEmpty(time))
+                {
+                    last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                    files = folder.GetFiles().Where(file => file.LastWriteTime > last && file.Name.StartsWith("TRIMEvent_" + Dataset + "_"));
+                }
+                var eventEntries = new ConcurrentDictionary<string, EventEntry>();
+                Regex addedRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+)(: \(workgroup notification\)) : Received (?<Count>\d+).+$", RegexOptions.Multiline | RegexOptions.Compiled);
+                Regex processedRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+):\s+(?<Data>processing event: \d+, eventtype =\d+, bobtype=\d+, boburi=\d+, event processed immediatel).+$", RegexOptions.Multiline | RegexOptions.Compiled);
+                Regex processedBufferRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+):\s+(?<Data>processing )(?<Count>\d+)(?<Buffer> buffered event).+$", RegexOptions.Multiline | RegexOptions.Compiled);
+                Parallel.ForEach(files, file =>
+                {
+                    using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                    {
+                        string logLines = sr.ReadToEnd();
+                        ProcessLogLines(logLines, addedRegex, eventEntries, "Total", match => Convert.ToInt32(match.Groups["Count"].Value));
+                        ProcessLogLines(logLines, processedRegex, eventEntries, "Processed", match => 1);
+                        ProcessLogLines(logLines, processedBufferRegex, eventEntries, "Processed", match => Convert.ToInt32(match.Groups["Count"].Value));
+                    }
+                });
+                msgBuilder.Append("<tr><td rowspan=\"" + eventEntries.Count + "\">" + Dataset + "</td>");
+                foreach (var entry in eventEntries.Values)
+                {
+                    msgBuilder.Append("<td>" + entry.Event + "</td><td>" + entry.Total + "</td><td>" + entry.Processed + "</td><td>" + (entry.Total - entry.Processed) + "</td></tr>");
+                }
+                XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
+                var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("Environments").Elements("Environment").Elements("Datasets").Elements("Dataset").Where(e => e.Attribute("Id").Value == Dataset).Single();
+                target.Attribute("LastUpdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
+                xmlDoc.Save("CM_Monitor.xml");
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex);
+            }
+        }
+
+        private static void ProcessLogLines(string logLines, Regex regex, ConcurrentDictionary<string, EventEntry> eventEntries, string field, Func<Match, int> valueSelector)
+        {
+            var matches = regex.Matches(logLines);
+            foreach (Match match in matches)
+            {
+                string eventName = match.Groups["Event"].Value;
+                eventEntries.AddOrUpdate(eventName, _ => new EventEntry
+                {
+                    Event = eventName,
+                    Total = field == "Total" ? valueSelector(match) : 0,
+                    Processed = field == "Processed" ? valueSelector(match) : 0
+                },
+                    (_, entry) =>
+                    {
+                        if (field == "Total")
+                        {
+                            entry.Total += valueSelector(match);
+                        }
+                        else if (field == "Processed")
+                        {
+                            entry.Processed += valueSelector(match);
+                        }
+                        return entry;
+                    });
+            }
+        }
+
         static public void UpdateXML(String Service, String Environment, String WGS, List<String[]> rows, DataTable dt)
         {
             try
@@ -730,8 +816,8 @@ namespace XML_Parse
                 if (Service != "" && Environment != "" && WGS != "")
                 {
                     XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
-                    var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("Environments").Elements("Environment").Where(e => e.Attribute("name").Value == Environment).Elements("WorkgroupServers").Elements("Workgroup").Where(e => e.Attribute("name").Value == WGS).Elements("LogPaths").Elements("Path").Where(e => e.Attribute("name").Value == Service).Single();
-                    target.Attribute("lastupdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
+                    var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("Environments").Elements("Environment").Where(e => e.Attribute("Name").Value == Environment).Elements("WorkgroupServers").Elements("Workgroup").Where(e => e.Attribute("Name").Value == WGS).Elements("LogPaths").Elements("Path").Where(e => e.Attribute("Name").Value == Service).Single();
+                    target.Attribute("LastUpdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
                     xmlDoc.Save("CM_Monitor.xml");
                 }
                 String csvFilePath = "Logs\\Detaliedlog-" + DateTime.Now.ToString("ddMMyyyy") + ".csv";
@@ -781,7 +867,12 @@ namespace XML_Parse
         {
             try
             {
-                log.Info("Local CPU Details : ");
+                String local = "Local";
+                foreach (XmlElement serverDetails in GetXML().SelectNodes("CM_Monitor/Environments/Environment"))
+                {
+                    local = serverDetails.GetAttribute("Name");
+                }
+                log.Info(local + " CPU Details : ");
                 decimal clockspeed = 0;
                 PerformanceCounter cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
                 PerformanceCounter ramCounter = new PerformanceCounter("Memory", "Available MBytes");
@@ -798,8 +889,8 @@ namespace XML_Parse
                     log.Info("Total Memory: " + GetTotalMemoryInMB() + " MB");
                     log.Info("Used Memory: " + (GetTotalMemoryInMB() - ramCounter.NextValue()) + " MB");
                     log.Info("Available Memory: " + ramCounter.NextValue() + " MB");
-                }                
-                msgBuilder.Append("<table id='security' border='2'><tr><th>Server</th><th>CPU/Drives</th><th>Total</th><th>Used</th><th>Available</th></tr><tr><td rowspan=\"drivecount\">Local</td><td>Utilization - " + cpuCounter.NextValue().ToString("0") + "% - " + clockspeed.ToString("0.##") + " GHz</td><td>RAM : " + GetTotalMemoryInMB() + " MB</td><td>RAM : " + (GetTotalMemoryInMB() - ramCounter.NextValue()) + " MB</td><td>RAM : " + ramCounter.NextValue() + " MB</td></tr>");
+                }
+                msgBuilder.Append("<table id='security' border='2'><tr><th>Server</th><th>CPU/Drives</th><th>Total</th><th>Used</th><th>Available</th></tr><tr><td rowspan=\"drivecount\">" + local + "</td><td>Utilization - " + cpuCounter.NextValue().ToString("0") + "% - " + clockspeed.ToString("0.##") + " GHz</td><td>RAM : " + GetTotalMemoryInMB() + " MB</td><td>RAM : " + (GetTotalMemoryInMB() - ramCounter.NextValue()) + " MB</td><td>RAM : " + ramCounter.NextValue() + " MB</td></tr>");
                 int drivecount = 1;
                 DriveInfo[] drives = DriveInfo.GetDrives();
                 foreach (DriveInfo drive in drives)
