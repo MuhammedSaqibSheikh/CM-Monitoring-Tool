@@ -50,6 +50,8 @@ namespace Encryption_Module
         private void button1_Click(object sender, EventArgs e)
         {
             textBox2.Text = EncryptPassword(textBox1.Text, false);
+            Clipboard.SetText(textBox2.Text);
+            label3.Text = "Encrypted Text Copied to Clipboard.";
         }
     }
 }

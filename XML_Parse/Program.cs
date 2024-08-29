@@ -41,17 +41,17 @@ namespace XML_Parse
     internal class Program
     {
         private static readonly ILog log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-        public static StringBuilder msgBuilder = new StringBuilder();
-        public static DataTable DTServer = new DataTable();
+        private static StringBuilder msgBuilder = new StringBuilder();
+        private static DataTable DTServer = new DataTable();
 
-        static void Main(string[] args)
+        static void Main(String[] args)
         {
-            DTServer.Columns.Add("IP");
-            DTServer.Columns.Add("Username");
-            DTServer.Columns.Add("Password");
             try
             {
-                msgBuilder.Append("<style>#security {width: 100%;border-radius:10px;border-spacing: 0;font-family:'Trebuchet MS', sans-serif;}#security td, #security th {border: 1px solid #ddd;padding: 10px;}#security tr:nth-child(even){background-color: #f2f2f2;}#security th {padding-top: 12px;padding-bottom: 12px;text-align: center;background-color: #5F9EA0;color: white;}</style><body style=\"font-family:'Trebuchet MS', sans-serif;\">Dear Admin,</br>Below is the summary of Content Manager Monitoring Tool on " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + " </br></br>");
+                DTServer.Columns.Add("IP");
+                DTServer.Columns.Add("Username");
+                DTServer.Columns.Add("Password");
+                msgBuilder.Append("<style>\n#security \n{width: 99%;border-radius:10px;border-spacing: 0;font-family:'Trebuchet MS', sans-serif;margin-left: auto;margin-right: auto;}\n#security td, #security th \n{border: 1px solid #ddd;padding: 10px;}\n#security tr:nth-child(even)\n{background-color: #f2f2f2;}\n#security th \n{padding-top: 12px;padding-bottom: 12px;text-align: center;background-color: #5F9EA0;color: white;}\n#myDiv\n{border: 2px outset #5F9EA0;text-align: center;}\n</style>\n<body style=\"font-family:'Trebuchet MS', sans-serif;\">\nDear Admin,</br>Below is the summary of Content Manager Monitoring Tool on " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n</br></br>");
                 GetCpuDetails();
                 DeleteLogFiles();
                 LoadServerDetails();
@@ -83,12 +83,11 @@ namespace XML_Parse
 
         private static void BuildReport()
         {
-            msgBuilder.Append("<table id='security' border='2'><tr><th>Environment</th><th>Servers</th><th>Services</th><th>CM Components</th><th>Monitoring Components</th><th>Status</th>");
+            msgBuilder.Append("\n<div id='mydiv'>\n<h3>CM Components Monitoring</h3>\n<table id='security' border='2'>\n<tr>\n<th>Environment</th>\n<th>Servers</th>\n<th>Services</th>\n<th>CM Components</th>\n<th>Monitoring Components</th>\n<th>Status</th>");
             foreach (XmlElement environmentNode in GetXML().SelectNodes("CM_Monitor/Environments/Environment"))
             {
-                int wgscount = 0;
-                int dscount = 0;
-                msgBuilder.Append("<tr><td rowspan=\"EnviCount\">" + environmentNode.GetAttribute("Name") + "</td>");
+                int wgscount = 0, dscount = 0;
+                msgBuilder.Append("\n<tr>\n<td rowspan=\"EnviCount\">" + environmentNode.GetAttribute("Name") + "</td>");
                 log.Info($"Environment: {environmentNode.GetAttribute("Name")}");
                 foreach (XmlElement workgroupNode in environmentNode.SelectNodes("WorkgroupServers/Workgroup"))
                 {
@@ -108,7 +107,7 @@ namespace XML_Parse
                 foreach (XmlElement servicesNode in windowsNode.SelectNodes("Services"))
                 {
                     DateTime lastUpdated = DateTime.Now.AddDays(-5);
-                    if (!string.IsNullOrEmpty(servicesNode.GetAttribute("LastUpdated")))
+                    if (!String.IsNullOrEmpty(servicesNode.GetAttribute("LastUpdated")))
                     {
                         lastUpdated = DateTime.ParseExact(servicesNode.GetAttribute("LastUpdated"), "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
                     }
@@ -116,7 +115,7 @@ namespace XML_Parse
                 }
             }
             msgBuilder.Length -= 4;
-            msgBuilder.Append("</body></table></br></br><table id='security' border='2'><tr><th>Dataset</th><th>Event Processor</th><th>Total Process</th><th>Processed</th><th>Queued</th></tr>");
+            msgBuilder.Append("\n</body>\n</table>\n</br></br>\n</div>\n</br></br>\n<div id='mydiv'>\n<h3>Event Processor Monitoring</h3>\n<table id='security' border='2'>\n<tr>\n<th>Dataset</th>\n<th>Event Processor</th>\n<th>Total Process</th>\n<th>Processed</th>\n<th>Queued</th>\n</tr>");
             foreach (XmlElement environmentNode in GetXML().SelectNodes("CM_Monitor/Environments/Environment"))
             {
                 foreach (XmlElement datasetNode in environmentNode.SelectNodes("Datasets/Dataset"))
@@ -124,18 +123,18 @@ namespace XML_Parse
                     EventProcessor(datasetNode.GetAttribute("Id"), datasetNode.GetAttribute("EventLogPath"), datasetNode.GetAttribute("LastUpdated"));
                 }
             }
-            msgBuilder.Append("</table>");
+            msgBuilder.Append("\n</table>\n</br></br>\n</div>\n</br></br>");
         }
 
-        private static void ProcessWorkgroup(XmlElement workgroupNode, string environmentName)
+        private static void ProcessWorkgroup(XmlElement workgroupNode, String environmentName)
         {
-            msgBuilder.Append("<td rowspan=\"11\">" + workgroupNode.GetAttribute("Name") + "</td><td rowspan=\"6\">CM Services</td>");
+            msgBuilder.Append("\n<td rowspan=\"11\">" + workgroupNode.GetAttribute("Name") + "</td>\n<td rowspan=\"6\">CM Services</td>");
             log.Info($"  Workgroup: {workgroupNode.GetAttribute("Name")}, Prop: {workgroupNode.GetAttribute("Prop")}");
             foreach (XmlElement serviceNode in workgroupNode.SelectNodes("Services/service"))
             {
-                if (!string.IsNullOrEmpty(serviceNode.GetAttribute("Prop")))
+                if (!String.IsNullOrEmpty(serviceNode.GetAttribute("Prop")))
                 {
-                    if (string.IsNullOrEmpty(serviceNode.GetAttribute("Server")))
+                    if (String.IsNullOrEmpty(serviceNode.GetAttribute("Server")))
                     {
                         CheckService(serviceNode.GetAttribute("Prop"), serviceNode.GetAttribute("Name"));
                     }
@@ -146,14 +145,14 @@ namespace XML_Parse
                 }
                 else
                 {
-                    msgBuilder.Append("</tr><tr>");
+                    msgBuilder.Append("\n</tr>\n<tr>");
                 }
             }
 
-            msgBuilder.Append("<td rowspan=\"5\">CM Logs</td>");
+            msgBuilder.Append("\n<td rowspan=\"5\">CM Logs</td>");
             foreach (XmlElement logPathNode in workgroupNode.SelectNodes("LogPaths/Path"))
             {
-                if (!string.IsNullOrEmpty(logPathNode.GetAttribute("Path")))
+                if (!String.IsNullOrEmpty(logPathNode.GetAttribute("Path")))
                 {
                     switch (logPathNode.GetAttribute("Name"))
                     {
@@ -169,7 +168,7 @@ namespace XML_Parse
                             CheckLDAPLogs(logPathNode.GetAttribute("Path"), "LDAPLogs", logPathNode.GetAttribute("LastUpdated"), environmentName, workgroupNode.GetAttribute("Name"));
                             break;
                         default:
-                            msgBuilder.Append("</tr><tr>");
+                            msgBuilder.Append("\n</tr>\n<tr>");
                             break;
                     }
                 }
@@ -178,11 +177,11 @@ namespace XML_Parse
 
         private static void ProcessDataset(XmlElement datasetNode)
         {
-            msgBuilder.Append("<td rowspan=\"3\">" + datasetNode.GetAttribute("Name") + " : " + datasetNode.GetAttribute("Id") + "</td>");
+            msgBuilder.Append("\n<td rowspan=\"3\">" + datasetNode.GetAttribute("Name") + " : " + datasetNode.GetAttribute("Id") + "</td>");
             log.Info($"  Dataset: {datasetNode.GetAttribute("Name")}, ID: {datasetNode.GetAttribute("Id")}");
             foreach (XmlElement urlNode in datasetNode.SelectNodes("urls/url"))
             {
-                if (!string.IsNullOrEmpty(urlNode.GetAttribute("Path")))
+                if (!String.IsNullOrEmpty(urlNode.GetAttribute("Path")))
                 {
                     switch (urlNode.GetAttribute("Name"))
                     {
@@ -196,7 +195,7 @@ namespace XML_Parse
                             CheckWebClient(urlNode.GetAttribute("Path"), "Web Drawer");
                             break;
                         default:
-                            msgBuilder.Append("</tr><tr>");
+                            msgBuilder.Append("\n</tr>\n<tr>");
                             break;
                     }
                 }
@@ -221,26 +220,26 @@ namespace XML_Parse
 
         private static void SaveHtmlReport()
         {
-            string reportFolder = Path.Combine(Environment.CurrentDirectory, "Reports");
+            String reportFolder = Path.Combine(Environment.CurrentDirectory, "Reports");
             if (!Directory.Exists(reportFolder))
             {
                 Directory.CreateDirectory(reportFolder);
             }
-            string mailFile = Path.Combine(reportFolder, "EmailOutput-" + DateTime.Now.ToString("ddMMyyyyHHmmss") + ".html");
+            String mailFile = Path.Combine(reportFolder, "EmailOutput-" + DateTime.Now.ToString("ddMMyyyyHHmmss") + ".html");
             using (StreamWriter sw = new StreamWriter(mailFile, false))
             {
                 sw.WriteLine(msgBuilder.ToString());
             }
         }
 
-        static public void CheckService(String ServiceName, String Service)
+        private static void CheckService(String ServiceName, String Service)
         {
             try
             {
                 ServiceController sc = new ServiceController(ServiceName);
                 log.Info($"   CM " + Service + " Service '" + sc.ServiceName + "' is " + sc.Status);
                 String color = sc.Status.ToString() != "Running" ? "Salmon" : "MediumSeaGreen";
-                msgBuilder.Append("<td>CM " + Service + "</td><td>" + sc.ServiceName + "</td><td bgcolor=\"" + color + "\">" + sc.Status + "</td></tr><tr>");
+                msgBuilder.Append("\n<td>CM " + Service + "</td>\n<td>" + sc.ServiceName + "</td>\n<td bgcolor=\"" + color + "\">" + sc.Status + "</td>\n</tr>\n<tr>");
             }
             catch (Exception ex)
             {
@@ -248,7 +247,7 @@ namespace XML_Parse
             }
         }
 
-        static public ConnectionOptions GetConnection(String Server)
+        private static ConnectionOptions GetConnection(String Server)
         {
             ConnectionOptions options = null;
             for (int i = 0; i < DTServer.Rows.Count; i++)
@@ -268,7 +267,7 @@ namespace XML_Parse
             return options;
         }
 
-        static public void CheckService(String Server, String ServiceName, String Service)
+        private static void CheckService(String Server, String ServiceName, String Service)
         {
             ManagementScope scope = new ManagementScope($"\\\\{Server}\\root\\cimv2", GetConnection(Server));
             try
@@ -281,7 +280,7 @@ namespace XML_Parse
                 {
                     log.Info($"   CM " + Service + " Service '" + ServiceName + "' is " + service["State"]);
                     String color = service["State"].ToString() != "Running" ? "Salmon" : "MediumSeaGreen";
-                    msgBuilder.Append("<td>CM " + Service + "</td><td>" + ServiceName + "</td><td bgcolor=\"" + color + "\">" + service["State"] + "</td></tr><tr>");
+                    msgBuilder.Append("\n<td>CM " + Service + "</td>\n<td>" + ServiceName + "</td>\n<td bgcolor=\"" + color + "\">" + service["State"] + "</td>\n</tr>\n<tr>");
                 }
             }
             catch (Exception ex)
@@ -290,21 +289,21 @@ namespace XML_Parse
             }
         }
 
-        static public void CheckWebClient(String URL, String Service)
+        private static void CheckWebClient(String URL, String Service)
         {
             int status = 0;
             X509Certificate2 cert = null;
             cert = GetSslCertificate(URL, Service, ref status);
             if (cert != null)
             {
-                LogSslCertificateInfo(URL, Service, cert);
+                LogSslCertificateInfo(URL, Service, cert, ref status);
             }
             CheckUrlAvailability(URL, Service, ref status);
-            string statusColor = status == 0 ? "MediumSeaGreen" : "Salmon";
+            String statusColor = status == 0 ? "MediumSeaGreen" : "Salmon";
             msgBuilder.Replace("statuscolor", statusColor);
         }
 
-        private static X509Certificate2 GetSslCertificate(string url, string service, ref int status)
+        private static X509Certificate2 GetSslCertificate(String url, String service, ref int status)
         {
             X509Certificate2 cert = null;
             try
@@ -322,7 +321,7 @@ namespace XML_Parse
             return cert;
         }
 
-        private static X509Certificate2 GetCertificateOnFailure(string url, string service, ref int status)
+        private static X509Certificate2 GetCertificateOnFailure(String url, String service, ref int status)
         {
             X509Certificate2 cert = null;
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
@@ -333,51 +332,53 @@ namespace XML_Parse
             }
             else
             {
-                status = 1;
-                log.Info($"No SSL Certificate Available for: {url}");
-                msgBuilder.Append($"<td>{service}</td><td>{url}</td><td>{service}</td><td bgcolor=\"statuscolor\">No SSL Certificate Available, ");
+                status = 0;
+                log.Info("No SSL Certificate Available for: " + url);
+                msgBuilder.Append("\n<td>" + service + "</td><td>" + url + "</td><td>" + service + "</td><td bgcolor=\"statuscolor\">No SSL Certificate Available, ");
             }
             return cert;
         }
 
-        private static void LogSslCertificateInfo(string url, string service, X509Certificate2 cert)
+        private static void LogSslCertificateInfo(String url, String service, X509Certificate2 cert, ref int status)
         {
             DateTime expirationDate = Convert.ToDateTime(cert.GetExpirationDateString());
             TimeSpan timeSpan = expirationDate - DateTime.Now;
-            string certInfo = $"SSL Certificate is valid till: {expirationDate:yyyy-MM-dd} for {url} ({timeSpan.Days} Days Remaining)";
+            String certInfo = "SSL Certificate is valid till: " + expirationDate.ToString("yyyy-MM-dd") + " for " + url + " (" + timeSpan.Days + " Days Remaining)";
             log.Info(certInfo);
-            msgBuilder.Append($"<td>{service}</td><td>{url}</td><td>{service}</td><td bgcolor=\"statuscolor\">{certInfo}, ");
+            msgBuilder.Append("\n<td>" + service + "</td>\n<td>" + url + "</td>\n<td>" + service + "</td>\n<td bgcolor=\"statuscolor\">" + certInfo + ", ");
+            if (expirationDate > DateTime.Now)
+            {
+                status = 1;
+            }
         }
 
-        private static void CheckUrlAvailability(string url, string service, ref int status)
+        private static void CheckUrlAvailability(String url, String service, ref int status)
         {
             try
             {
                 HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-                request.UseDefaultCredentials = true;
-                request.PreAuthenticate = true;
+                request.UseDefaultCredentials = request.PreAuthenticate = true;
                 request.Credentials = CredentialCache.DefaultCredentials;
-
                 using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
                 {
                     if (response.StatusCode == HttpStatusCode.OK)
                     {
-                        log.Info($"{service} '{url}' Available");
-                        msgBuilder.Append("URL is Available</td></tr><tr>");
+                        log.Info("" + service + " '" + url + "' Available");
+                        msgBuilder.Append("URL is Available</td>\n</tr>\n<tr>");
                     }
                     else
                     {
                         status = 1;
-                        log.Info($"{service} '{url}' Returned, but with status: {response.StatusDescription}");
-                        msgBuilder.Append($"URL Returned, but with status: {response.StatusDescription}</td></tr><tr>");
+                        log.Info("" + service + " '" + url + "' Returned, but with status: " + response.StatusDescription);
+                        msgBuilder.Append("URL Returned, but with status: " + response.StatusDescription + "</td>\n</tr>\n<tr>");
                     }
                 }
             }
             catch (Exception ex)
             {
                 status = 1;
-                log.Error($"{service} '{url}' unavailable: {ex.Message}");
-                msgBuilder.Append("URL is Unavailable</td></tr><tr>");
+                log.Error(service + " '" + url + "' unavailable: " + ex);
+                msgBuilder.Append("URL is Unavailable</td>\n</tr>\n<tr>");
             }
         }
 
@@ -391,7 +392,7 @@ namespace XML_Parse
             return dt;
         }
 
-        static public void CheckLogs(String path, String Service, String time, String Environment, String WGS)
+        private static void CheckLogs(String path, String Service, String time, String Environment, String WGS)
         {
             try
             {
@@ -413,9 +414,9 @@ namespace XML_Parse
                     using (StreamReader sr = new StreamReader(fs, Encoding.Default))
                     {
                         String logLines = sr.ReadToEnd();
-                        String pattern = @"^(?<Timestamp>\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\,\d{3})\s\[(?<ThreadId>\d+)\]\s(?<LogLevel>\w+)\s(?<ErrorMessage>.+)$";
+                        Regex pattern = new Regex(@"^(?<Timestamp>\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\,\d{3})\s\[(?<ThreadId>\d+)\]\s(?<LogLevel>\w+)\s(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
                         List<LogEntry> logEntries = new List<LogEntry>();
-                        MatchCollection matches = Regex.Matches(logLines, pattern, RegexOptions.Multiline);
+                        var matches = pattern.Matches(logLines);
                         foreach (Match match in matches)
                         {
                             LogEntry logEntry = new LogEntry
@@ -478,7 +479,7 @@ namespace XML_Parse
                 });
                 UpdateXML(Service, Environment, WGS, rows, dt);
                 String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
-                msgBuilder.Append("<td>" + Service + "</td><td>" + Service + "</td><td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td></tr><tr>");
+                msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
             }
             catch (Exception ex)
             {
@@ -486,7 +487,7 @@ namespace XML_Parse
             }
         }
 
-        static public void CheckWGSLogs(String path, String Service, String time, String Environment, String WGS)
+        private static void CheckWGSLogs(String path, String Service, String time, String Environment, String WGS)
         {
             try
             {
@@ -508,9 +509,9 @@ namespace XML_Parse
                     using (StreamReader sr = new StreamReader(fs, Encoding.Default))
                     {
                         String logLines = sr.ReadToEnd();
-                        String pattern = @"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<UnknownField>\d+)\s+(?<UnknownField2>\d+)\s+(?<LogLevel>\w+):\s+(?<ErrorMessage>.+)$";
+                        Regex pattern = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<UnknownField>\d+)\s+(?<UnknownField2>\d+)\s+(?<LogLevel>\w+):\s+(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
                         List<LogEntry> logEntries = new List<LogEntry>();
-                        MatchCollection matches = Regex.Matches(logLines, pattern, RegexOptions.Multiline);
+                        var matches = pattern.Matches(logLines);
                         foreach (Match match in matches)
                         {
                             LogEntry logEntry = new LogEntry
@@ -573,7 +574,7 @@ namespace XML_Parse
                     }
                 });
                 String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
-                msgBuilder.Append("<td>" + Service + "</td><td>" + Service + "</td><td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td></tr><tr>");
+                msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
                 UpdateXML(Service, Environment, WGS, rows, dt);
             }
             catch (Exception ex)
@@ -582,7 +583,7 @@ namespace XML_Parse
             }
         }
 
-        static public void EventViewerLog(String logName, String sourceName, DateTime lastdate)
+        private static void EventViewerLog(String logName, String sourceName, DateTime lastdate)
         {
             try
             {
@@ -631,7 +632,7 @@ namespace XML_Parse
                     }
                 });
                 String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
-                msgBuilder.Append("<td></td><td></td><td>Event Viewer Logs</td><td>" + sourceName + "</td><td>Windows Event Logs</td><td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + lastdate.ToString("dd-MM-yyyy HH:mm:ss.fff") + "</td></tr><tr>");
+                msgBuilder.Append("\n<td></td>\n<td></td>\n<td>Event Viewer Logs</td>\n<td>" + sourceName + "</td>\n<td>Windows Event Logs</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + lastdate.ToString("dd-MM-yyyy HH:mm:ss.fff") + "</td>\n</tr>\n<tr>");
                 XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
                 var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("WindowsEvent").Elements("Services").Where(e => e.Attribute("Name").Value == sourceName).Single();
                 target.Attribute("LastUpdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
@@ -644,7 +645,7 @@ namespace XML_Parse
             }
         }
 
-        static public void CheckLDAPLogs(String path, String Service, String time, String Environment, String WGS)
+        private static void CheckLDAPLogs(String path, String Service, String time, String Environment, String WGS)
         {
             try
             {
@@ -666,9 +667,9 @@ namespace XML_Parse
                     using (StreamReader sr = new StreamReader(fs, Encoding.Default))
                     {
                         String logLines = sr.ReadToEnd();
-                        String pattern = @"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<LogLevel>--|-\w+-|-\w+-|\*)\s+(?<ErrorMessage>.+)$";
+                        Regex pattern = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<LogLevel>--|-\w+-|-\w+-|\*)\s+(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
                         List<LogEntry> logEntries = new List<LogEntry>();
-                        MatchCollection matches = Regex.Matches(logLines, pattern, RegexOptions.Multiline);
+                        var matches = pattern.Matches(logLines);
                         foreach (Match match in matches)
                         {
                             LogEntry logEntry = new LogEntry
@@ -730,7 +731,7 @@ namespace XML_Parse
                     }
                 });
                 String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
-                msgBuilder.Append("<td>" + Service + "</td><td>" + Service + "</td><td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td></tr><tr>");
+                msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
                 UpdateXML(Service, Environment, WGS, rows, dt);
             }
             catch (Exception ex)
@@ -739,7 +740,7 @@ namespace XML_Parse
             }
         }
 
-        static public void EventProcessor(String Dataset, String LogPath, String time)
+        private static void EventProcessor(String Dataset, String LogPath, String time)
         {
             try
             {
@@ -751,7 +752,7 @@ namespace XML_Parse
                     last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
                     files = folder.GetFiles().Where(file => file.LastWriteTime > last && file.Name.StartsWith("TRIMEvent_" + Dataset + "_"));
                 }
-                var eventEntries = new ConcurrentDictionary<string, EventEntry>();
+                var eventEntries = new ConcurrentDictionary<String, EventEntry>();
                 Regex addedRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+)(: \(workgroup notification\)) : Received (?<Count>\d+).+$", RegexOptions.Multiline | RegexOptions.Compiled);
                 Regex processedRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+):\s+(?<Data>processing event: \d+, eventtype =\d+, bobtype=\d+, boburi=\d+, event processed immediatel).+$", RegexOptions.Multiline | RegexOptions.Compiled);
                 Regex processedBufferRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+):\s+(?<Data>processing )(?<Count>\d+)(?<Buffer> buffered event).+$", RegexOptions.Multiline | RegexOptions.Compiled);
@@ -760,16 +761,16 @@ namespace XML_Parse
                     using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                     using (StreamReader sr = new StreamReader(fs, Encoding.Default))
                     {
-                        string logLines = sr.ReadToEnd();
+                        String logLines = sr.ReadToEnd();
                         ProcessLogLines(logLines, addedRegex, eventEntries, "Total", match => Convert.ToInt32(match.Groups["Count"].Value));
                         ProcessLogLines(logLines, processedRegex, eventEntries, "Processed", match => 1);
                         ProcessLogLines(logLines, processedBufferRegex, eventEntries, "Processed", match => Convert.ToInt32(match.Groups["Count"].Value));
                     }
                 });
-                msgBuilder.Append("<tr><td rowspan=\"" + eventEntries.Count + "\">" + Dataset + "</td>");
+                msgBuilder.Append("\n<tr>\n<td rowspan=\"" + eventEntries.Count + "\">" + Dataset + "</td>");
                 foreach (var entry in eventEntries.Values)
                 {
-                    msgBuilder.Append("<td>" + entry.Event + "</td><td>" + entry.Total + "</td><td>" + entry.Processed + "</td><td>" + (entry.Total - entry.Processed) + "</td></tr>");
+                    msgBuilder.Append("\n<td>" + entry.Event + "</td>\n<td>" + entry.Total + "</td>\n<td>" + entry.Processed + "</td>\n<td>" + (entry.Total - entry.Processed) + "</td>\n</tr>");
                 }
                 XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
                 var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("Environments").Elements("Environment").Elements("Datasets").Elements("Dataset").Where(e => e.Attribute("Id").Value == Dataset).Single();
@@ -782,12 +783,12 @@ namespace XML_Parse
             }
         }
 
-        private static void ProcessLogLines(string logLines, Regex regex, ConcurrentDictionary<string, EventEntry> eventEntries, string field, Func<Match, int> valueSelector)
+        private static void ProcessLogLines(String logLines, Regex regex, ConcurrentDictionary<String, EventEntry> eventEntries, String field, Func<Match, int> valueSelector)
         {
             var matches = regex.Matches(logLines);
             foreach (Match match in matches)
             {
-                string eventName = match.Groups["Event"].Value;
+                String eventName = match.Groups["Event"].Value;
                 eventEntries.AddOrUpdate(eventName, _ => new EventEntry
                 {
                     Event = eventName,
@@ -809,7 +810,7 @@ namespace XML_Parse
             }
         }
 
-        static public void UpdateXML(String Service, String Environment, String WGS, List<String[]> rows, DataTable dt)
+        private static void UpdateXML(String Service, String Environment, String WGS, List<String[]> rows, DataTable dt)
         {
             try
             {
@@ -851,7 +852,7 @@ namespace XML_Parse
             }
         }
 
-        static public String QuoteIfNeeded(String value)
+        private static String QuoteIfNeeded(String value)
         {
             if (value.Contains(",") || value.Contains("\"") || value.Contains("\r") || value.Contains("\n"))
             {
@@ -863,7 +864,7 @@ namespace XML_Parse
             }
         }
 
-        static public void GetCpuDetails()
+        private static void GetCpuDetails()
         {
             try
             {
@@ -890,7 +891,7 @@ namespace XML_Parse
                     log.Info("Used Memory: " + (GetTotalMemoryInMB() - ramCounter.NextValue()) + " MB");
                     log.Info("Available Memory: " + ramCounter.NextValue() + " MB");
                 }
-                msgBuilder.Append("<table id='security' border='2'><tr><th>Server</th><th>CPU/Drives</th><th>Total</th><th>Used</th><th>Available</th></tr><tr><td rowspan=\"drivecount\">" + local + "</td><td>Utilization - " + cpuCounter.NextValue().ToString("0") + "% - " + clockspeed.ToString("0.##") + " GHz</td><td>RAM : " + GetTotalMemoryInMB() + " MB</td><td>RAM : " + (GetTotalMemoryInMB() - ramCounter.NextValue()) + " MB</td><td>RAM : " + ramCounter.NextValue() + " MB</td></tr>");
+                msgBuilder.Append("\n<div id='mydiv'>\n<h3>System Monitoring</h3>\n<table id='security' border='2'>\n<tr>\n<th>Server</th>\n<th>CPU/Drives</th>\n<th>Total</th>\n<th>Used</th>\n<th>Available</th>\n</tr>\n<tr>\n<td rowspan=\"drivecount\">" + local + "</td>\n<td>Utilization - " + cpuCounter.NextValue().ToString("0") + "% - " + clockspeed.ToString("0.##") + " GHz</td>\n<td>RAM : " + GetTotalMemoryInMB() + " MB</td>\n<td>RAM : " + (GetTotalMemoryInMB() - ramCounter.NextValue()) + " MB</td>\n<td>RAM : " + ramCounter.NextValue() + " MB</td>\n</tr>");
                 int drivecount = 1;
                 DriveInfo[] drives = DriveInfo.GetDrives();
                 foreach (DriveInfo drive in drives)
@@ -905,7 +906,7 @@ namespace XML_Parse
                         log.Info("Total Size: " + total.ToString("0.##") + " GB");
                         log.Info("Used Size: " + used.ToString("0.##") + " GB - " + ((used * 100) / total).ToString("0.##") + "%");
                         log.Info("Available Size: " + available.ToString("0.##") + " GB - " + ((available * 100) / total).ToString("0.##") + "%");
-                        msgBuilder.AppendLine("<tr><td>" + drive.VolumeLabel + " - " + drive.Name + "</td><td>Size : " + total.ToString("0.##") + " GB</td><td>Size : " + used.ToString("0.##") + " GB - " + ((used * 100) / total).ToString("0.##") + "%</td><td>Size : " + available.ToString("0.##") + " GB - " + ((available * 100) / total).ToString("0.##") + "%</td></tr>");
+                        msgBuilder.AppendLine("\n<tr>\n<td>" + drive.VolumeLabel + " - " + drive.Name + "</td>\n<td>Size : " + total.ToString("0.##") + " GB</td>\n<td>Size : " + used.ToString("0.##") + " GB - " + ((used * 100) / total).ToString("0.##") + "%</td>\n<td>Size : " + available.ToString("0.##") + " GB - " + ((available * 100) / total).ToString("0.##") + "%</td>\n</tr>");
                         drivecount += 1;
                     }
                 }
@@ -917,7 +918,7 @@ namespace XML_Parse
             }
         }
 
-        static public void GetCpuDetails(String Server)
+        private static void GetCpuDetails(String Server)
         {
             try
             {
@@ -930,10 +931,8 @@ namespace XML_Parse
                 {
                     foreach (ManagementObject mo in searcher.Get())
                     {
-                        clockspeed = Convert.ToDecimal(mo["CurrentClockSpeed"]) / 1000;
-                        clockper = Convert.ToDecimal(mo["LoadPercentage"]);
-                        log.Info("CPU Usage: " + clockper.ToString("0") + "%");
-                        log.Info("Current Clock Speed: " + clockspeed.ToString("0.##") + " GHz");
+                        log.Info("CPU Usage: " + (Convert.ToDecimal(mo["LoadPercentage"])).ToString("0") + "%");
+                        log.Info("Current Clock Speed: " + (Convert.ToDecimal(mo["CurrentClockSpeed"]) / 1000).ToString("0.##") + " GHz");
                         break;
                     }
                 }
@@ -948,7 +947,7 @@ namespace XML_Parse
                         log.Info("Total Memory: " + totalMemory / 1024 + " MB");
                         log.Info("Used Memory: " + usedMemory / 1024 + " MB");
                         log.Info("Available Memory: " + freeMemory / 1024 + " MB");
-                        msgBuilder.Append("<tr><td rowspan=\"drivecount\">" + Server + "</td><td>Utilization - " + clockper.ToString("0") + "% - " + clockspeed.ToString("0.##") + " GHz</td><td>RAM : " + totalMemory / 1024 + " MB</td><td>RAM : " + usedMemory / 1024 + " MB</td><td>RAM : " + freeMemory / 1024 + " MB</td></tr>");
+                        msgBuilder.Append("\n<tr>\n<td rowspan=\"drivecount\">" + Server + "</td>\n<td>Utilization - " + clockper.ToString("0") + "% - " + clockspeed.ToString("0.##") + " GHz</td>\n<td>RAM : " + totalMemory / 1024 + " MB</td>\n<td>RAM : " + usedMemory / 1024 + " MB</td>\n<td>RAM : " + freeMemory / 1024 + " MB</td>\n</tr>");
                     }
                 }
                 int drivecount = 1;
@@ -967,13 +966,13 @@ namespace XML_Parse
                             log.Info("Total Size: " + total + " GB");
                             log.Info("Used Size: " + used + " GB- " + ((used * 100) / total).ToString("0.##") + "%");
                             log.Info("Available Space: " + available + " GB- " + ((available * 100) / total).ToString("0.##") + "%");
-                            msgBuilder.AppendLine("<tr><td>" + mo["VolumeName"] + " - " + mo["DeviceID"] + "\\</td><td>Size : " + total.ToString("0.##") + " GB</td><td>Size : " + used.ToString("0.##") + " GB - " + ((used * 100) / total).ToString("0.##") + "%</td><td>Size : " + available.ToString("0.##") + " GB - " + ((available * 100) / total).ToString("0.##") + "%</td></tr>");
+                            msgBuilder.AppendLine("\n<tr>\n<td>" + mo["VolumeName"] + " - " + mo["DeviceID"] + "\\</td>\n<td>Size : " + total.ToString("0.##") + " GB</td>\n<td>Size : " + used.ToString("0.##") + " GB - " + ((used * 100) / total).ToString("0.##") + "%</td>\n<td>Size : " + available.ToString("0.##") + " GB - " + ((available * 100) / total).ToString("0.##") + "%</td>\n</tr>");
                             drivecount += 1;
                         }
                     }
                 }
                 msgBuilder.Replace("drivecount", drivecount + "");
-                msgBuilder.AppendLine("</table></br></br>");
+                msgBuilder.AppendLine("\n</table>\n</br></br></div>\n</br></br>");
             }
             catch (Exception ex)
             {
@@ -981,7 +980,7 @@ namespace XML_Parse
             }
         }
 
-        static ulong GetTotalMemoryInMB()
+        private static ulong GetTotalMemoryInMB()
         {
             using (ManagementObjectSearcher mos = new ManagementObjectSearcher("SELECT TotalPhysicalMemory FROM Win32_ComputerSystem"))
             {
@@ -993,7 +992,7 @@ namespace XML_Parse
             return 0;
         }
 
-        static public void SendMail(String From, String To, String Subject, String SmtpServer, int SmtpPort)
+        private static void SendMail(String From, String To, String Subject, String SmtpServer, int SmtpPort)
         {
             try
             {
@@ -1013,7 +1012,7 @@ namespace XML_Parse
             }
         }
 
-        static public void DeleteLogFiles()
+        private static void DeleteLogFiles()
         {
             String[] files = Directory.GetFiles("Logs\\");
             foreach (String file in files)
@@ -1034,11 +1033,11 @@ namespace XML_Parse
             }
         }
 
-        public static string Decrypt(string cipherString, bool useHashing)
+        private static String Decrypt(String cipherString, bool useHashing)
         {
             byte[] keyArray;
             byte[] toEncryptArray = Convert.FromBase64String(cipherString);
-            string key = "WETHEPEOPLEOFINDIAHAVING";
+            String key = "WETHEPEOPLEOFINDIAHAVING";
             if (useHashing)
             {
                 using (SHA256CryptoServiceProvider hashSha256 = new SHA256CryptoServiceProvider())
@@ -1054,11 +1053,8 @@ namespace XML_Parse
             {
                 tdes.Key = keyArray;
                 tdes.Mode = CipherMode.ECB;
-                tdes.Padding = PaddingMode.PKCS7;
-
                 ICryptoTransform cTransform = tdes.CreateDecryptor();
                 byte[] resultArray = cTransform.TransformFinalBlock(toEncryptArray, 0, toEncryptArray.Length);
-
                 return Encoding.UTF8.GetString(resultArray);
             }
         }
