@@ -48,12 +48,12 @@ namespace XML_Parse
         {
             try
             {
+                DeleteLogFiles();
                 DTServer.Columns.Add("IP");
                 DTServer.Columns.Add("Username");
                 DTServer.Columns.Add("Password");
                 msgBuilder.Append("<style>\n#security \n{width: 99%;border-radius:10px;border-spacing: 0;font-family:'Trebuchet MS', sans-serif;margin-left: auto;margin-right: auto;}\n#security td, #security th \n{border: 1px solid #ddd;padding: 10px;}\n#security tr:nth-child(even)\n{background-color: #f2f2f2;}\n#security th \n{padding-top: 12px;padding-bottom: 12px;text-align: center;background-color: #5F9EA0;color: white;}\n#myDiv\n{border: 2px outset #5F9EA0;text-align: center;}\n</style>\n<body style=\"font-family:'Trebuchet MS', sans-serif;\">\nDear Admin,</br>Below is the summary of Content Manager Monitoring Tool on " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n</br></br>");
-                GetCpuDetails();
-                DeleteLogFiles();
+                GetCpuDetails();                
                 LoadServerDetails();
                 BuildReport();
                 GenerateEmailReport();
@@ -88,7 +88,7 @@ namespace XML_Parse
             {
                 int wgscount = 0, dscount = 0;
                 msgBuilder.Append("\n<tr>\n<td rowspan=\"EnviCount\">" + environmentNode.GetAttribute("Name") + "</td>");
-                log.Info($"Environment: {environmentNode.GetAttribute("Name")}");
+                log.Info("Environment: " + environmentNode.GetAttribute("Name"));
                 foreach (XmlElement workgroupNode in environmentNode.SelectNodes("WorkgroupServers/Workgroup"))
                 {
                     wgscount += 1;
@@ -129,7 +129,7 @@ namespace XML_Parse
         private static void ProcessWorkgroup(XmlElement workgroupNode, String environmentName)
         {
             msgBuilder.Append("\n<td rowspan=\"11\">" + workgroupNode.GetAttribute("Name") + "</td>\n<td rowspan=\"6\">CM Services</td>");
-            log.Info($"  Workgroup: {workgroupNode.GetAttribute("Name")}, Prop: {workgroupNode.GetAttribute("Prop")}");
+            log.Info("  Workgroup: " + workgroupNode.GetAttribute("Name") + ", Prop: " + workgroupNode.GetAttribute("Prop"));
             foreach (XmlElement serviceNode in workgroupNode.SelectNodes("Services/service"))
             {
                 if (!String.IsNullOrEmpty(serviceNode.GetAttribute("Prop")))
@@ -148,7 +148,6 @@ namespace XML_Parse
                     msgBuilder.Append("\n</tr>\n<tr>");
                 }
             }
-
             msgBuilder.Append("\n<td rowspan=\"5\">CM Logs</td>");
             foreach (XmlElement logPathNode in workgroupNode.SelectNodes("LogPaths/Path"))
             {
@@ -178,7 +177,7 @@ namespace XML_Parse
         private static void ProcessDataset(XmlElement datasetNode)
         {
             msgBuilder.Append("\n<td rowspan=\"3\">" + datasetNode.GetAttribute("Name") + " : " + datasetNode.GetAttribute("Id") + "</td>");
-            log.Info($"  Dataset: {datasetNode.GetAttribute("Name")}, ID: {datasetNode.GetAttribute("Id")}");
+            log.Info("  Dataset: " + datasetNode.GetAttribute("Name") + ", ID: " + datasetNode.GetAttribute("Id"));
             foreach (XmlElement urlNode in datasetNode.SelectNodes("urls/url"))
             {
                 if (!String.IsNullOrEmpty(urlNode.GetAttribute("Path")))
@@ -220,15 +219,22 @@ namespace XML_Parse
 
         private static void SaveHtmlReport()
         {
-            String reportFolder = Path.Combine(Environment.CurrentDirectory, "Reports");
-            if (!Directory.Exists(reportFolder))
+            try
             {
-                Directory.CreateDirectory(reportFolder);
+                String reportFolder = Path.Combine(Environment.CurrentDirectory, "Reports");
+                if (!Directory.Exists(reportFolder))
+                {
+                    Directory.CreateDirectory(reportFolder);
+                }
+                String mailFile = Path.Combine(reportFolder, "EmailOutput-" + DateTime.Now.ToString("ddMMyyyyHHmmss") + ".html");
+                using (StreamWriter sw = new StreamWriter(mailFile, false))
+                {
+                    sw.WriteLine(msgBuilder.ToString());
+                }
             }
-            String mailFile = Path.Combine(reportFolder, "EmailOutput-" + DateTime.Now.ToString("ddMMyyyyHHmmss") + ".html");
-            using (StreamWriter sw = new StreamWriter(mailFile, false))
+            catch (Exception ex)
             {
-                sw.WriteLine(msgBuilder.ToString());
+                log.Error(ex);
             }
         }
 
@@ -237,7 +243,7 @@ namespace XML_Parse
             try
             {
                 ServiceController sc = new ServiceController(ServiceName);
-                log.Info($"   CM " + Service + " Service '" + sc.ServiceName + "' is " + sc.Status);
+                log.Info("   CM " + Service + " Service '" + sc.ServiceName + "' is " + sc.Status);
                 String color = sc.Status.ToString() != "Running" ? "Salmon" : "MediumSeaGreen";
                 msgBuilder.Append("\n<td>CM " + Service + "</td>\n<td>" + sc.ServiceName + "</td>\n<td bgcolor=\"" + color + "\">" + sc.Status + "</td>\n</tr>\n<tr>");
             }
@@ -269,7 +275,7 @@ namespace XML_Parse
 
         private static void CheckService(String Server, String ServiceName, String Service)
         {
-            ManagementScope scope = new ManagementScope($"\\\\{Server}\\root\\cimv2", GetConnection(Server));
+            ManagementScope scope = new ManagementScope("\\\\" + Server + "\\root\\cimv2", GetConnection(Server));
             try
             {
                 scope.Connect();
@@ -278,7 +284,7 @@ namespace XML_Parse
                 ManagementObjectCollection services = searcher.Get();
                 foreach (ManagementObject service in services)
                 {
-                    log.Info($"   CM " + Service + " Service '" + ServiceName + "' is " + service["State"]);
+                    log.Info("   CM " + Service + " Service '" + ServiceName + "' is " + service["State"]);
                     String color = service["State"].ToString() != "Running" ? "Salmon" : "MediumSeaGreen";
                     msgBuilder.Append("\n<td>CM " + Service + "</td>\n<td>" + ServiceName + "</td>\n<td bgcolor=\"" + color + "\">" + service["State"] + "</td>\n</tr>\n<tr>");
                 }
@@ -399,87 +405,90 @@ namespace XML_Parse
                 DataTable dt = InitializeDataTable();
                 List<String[]> rows = new List<String[]>();
                 DateTime last = DateTime.Now;
-                DirectoryInfo folder = new DirectoryInfo(path);
-                var files = folder.GetFiles().Where(file => file.Name.Equals("log-file.txt", StringComparison.OrdinalIgnoreCase) && file.LastWriteTime < last);
-                if (!String.IsNullOrEmpty(time))
+                if (Directory.Exists(path))
                 {
-                    last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
-                    files = folder.GetFiles().Where(file => file.Name.Equals("log-file.txt", StringComparison.OrdinalIgnoreCase) && file.LastWriteTime > last);
-                }
-                object dtLock = new object();
-                object rowsLock = new object();
-                Parallel.ForEach(files, file =>
-                {
-                    using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                    DirectoryInfo folder = new DirectoryInfo(path);
+                    var files = folder.GetFiles().Where(file => file.Name.Equals("log-file.txt", StringComparison.OrdinalIgnoreCase) && file.LastWriteTime < last);
+                    if (!String.IsNullOrEmpty(time))
                     {
-                        String logLines = sr.ReadToEnd();
-                        Regex pattern = new Regex(@"^(?<Timestamp>\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\,\d{3})\s\[(?<ThreadId>\d+)\]\s(?<LogLevel>\w+)\s(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
-                        List<LogEntry> logEntries = new List<LogEntry>();
-                        var matches = pattern.Matches(logLines);
-                        foreach (Match match in matches)
-                        {
-                            LogEntry logEntry = new LogEntry
-                            {
-                                Timestamp = DateTime.ParseExact(match.Groups["Timestamp"].Value, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture),
-                                ThreadId = match.Groups["ThreadId"].Value,
-                                LogLevel = match.Groups["LogLevel"].Value,
-                                ErrorMessage = match.Groups["ErrorMessage"].Value
-                            };
-                            if (logEntry.LogLevel == "ERROR")
-                            {
-                                if (!String.IsNullOrEmpty(time))
-                                {
-                                    DateTime lastupdated = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
-                                    if (logEntry.Timestamp < lastupdated)
-                                    {
-                                        continue;
-                                    }
-                                }
-                                logEntries.Add(logEntry);
-                            }
-                        }
-                        lock (dtLock)
-                        {
-                            foreach (var entry in logEntries)
-                            {
-                                log.Info($"Timestamp: {entry.Timestamp}, ThreadId: {entry.ThreadId}, LogLevel: {entry.LogLevel}, ErrorMessage: {entry.ErrorMessage.Trim()}");
-                                String[] row = { entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), Environment, WGS, "", entry.ThreadId, entry.LogLevel, entry.ErrorMessage.Trim() };
-                                lock (rowsLock)
-                                {
-                                    rows.Add(row);
-                                }
-                                int flag = 0;
-                                for (int i = 0; i < dt.Rows.Count; i++)
-                                {
-                                    if (dt.Rows[i][2].ToString() == entry.ErrorMessage.Trim())
-                                    {
-                                        DateTime first = DateTime.ParseExact(dt.Rows[i][0] + "", "dd-MM-yyyy HH:mm:ss.fff", CultureInfo.InvariantCulture);
-                                        if (first > entry.Timestamp)
-                                        {
-                                            dt.Rows[i][0] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
-                                        }
-                                        else
-                                        {
-                                            dt.Rows[i][1] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
-                                        }
-                                        int count = int.Parse(dt.Rows[i][3] + "");
-                                        dt.Rows[i][3] = count + 1;
-                                        flag = 1;
-                                        break;
-                                    }
-                                }
-                                if (flag == 0)
-                                {
-                                    dt.Rows.Add(entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.ErrorMessage.Trim(), 1);
-                                }
-                            }
-                        }
+                        last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                        files = folder.GetFiles().Where(file => file.Name.Equals("log-file.txt", StringComparison.OrdinalIgnoreCase) && file.LastWriteTime > last);
                     }
-                });
-                UpdateXML(Service, Environment, WGS, rows, dt);
-                String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
-                msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
+                    object dtLock = new object();
+                    object rowsLock = new object();
+                    Parallel.ForEach(files, file =>
+                    {
+                        using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                        {
+                            String logLines = sr.ReadToEnd();
+                            Regex pattern = new Regex(@"^(?<Timestamp>\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}\,\d{3})\s\[(?<ThreadId>\d+)\]\s(?<LogLevel>\w+)\s(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+                            List<LogEntry> logEntries = new List<LogEntry>();
+                            var matches = pattern.Matches(logLines);
+                            foreach (Match match in matches)
+                            {
+                                LogEntry logEntry = new LogEntry
+                                {
+                                    Timestamp = DateTime.ParseExact(match.Groups["Timestamp"].Value, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture),
+                                    ThreadId = match.Groups["ThreadId"].Value,
+                                    LogLevel = match.Groups["LogLevel"].Value,
+                                    ErrorMessage = match.Groups["ErrorMessage"].Value
+                                };
+                                if (logEntry.LogLevel == "ERROR")
+                                {
+                                    if (!String.IsNullOrEmpty(time))
+                                    {
+                                        DateTime lastupdated = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                                        if (logEntry.Timestamp < lastupdated)
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                    logEntries.Add(logEntry);
+                                }
+                            }
+                            lock (dtLock)
+                            {
+                                foreach (var entry in logEntries)
+                                {
+                                    log.Info("Timestamp: " + entry.Timestamp + ", ThreadId: " + entry.ThreadId + ", LogLevel: " + entry.LogLevel + ", ErrorMessage: " + entry.ErrorMessage.Trim());
+                                    String[] row = { entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), Environment, WGS, "", entry.ThreadId, entry.LogLevel, entry.ErrorMessage.Trim() };
+                                    lock (rowsLock)
+                                    {
+                                        rows.Add(row);
+                                    }
+                                    int flag = 0;
+                                    for (int i = 0; i < dt.Rows.Count; i++)
+                                    {
+                                        if (dt.Rows[i][2].ToString() == entry.ErrorMessage.Trim())
+                                        {
+                                            DateTime first = DateTime.ParseExact(dt.Rows[i][0] + "", "dd-MM-yyyy HH:mm:ss.fff", CultureInfo.InvariantCulture);
+                                            if (first > entry.Timestamp)
+                                            {
+                                                dt.Rows[i][0] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
+                                            }
+                                            else
+                                            {
+                                                dt.Rows[i][1] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
+                                            }
+                                            int count = int.Parse(dt.Rows[i][3] + "");
+                                            dt.Rows[i][3] = count + 1;
+                                            flag = 1;
+                                            break;
+                                        }
+                                    }
+                                    if (flag == 0)
+                                    {
+                                        dt.Rows.Add(entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.ErrorMessage.Trim(), 1);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    UpdateXML(Service, Environment, WGS, rows, dt);
+                    String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
+                    msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
+                }
             }
             catch (Exception ex)
             {
@@ -494,88 +503,91 @@ namespace XML_Parse
                 DataTable dt = InitializeDataTable();
                 List<String[]> rows = new List<String[]>();
                 DateTime last = DateTime.Now;
-                DirectoryInfo folder = new DirectoryInfo(path);
-                var files = folder.GetFiles().Where(file => file.Name.StartsWith("TRIMWorkgroup") && file.LastWriteTime < last && file.Extension == ".log");
-                if (!String.IsNullOrEmpty(time))
+                if (Directory.Exists(path))
                 {
-                    last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
-                    files = folder.GetFiles().Where(file => file.Name.StartsWith("TRIMWorkgroup") && file.LastWriteTime > last && file.Extension == ".log");
-                }
-                object dtLock = new object();
-                object rowsLock = new object();
-                Parallel.ForEach(files, file =>
-                {
-                    using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                    DirectoryInfo folder = new DirectoryInfo(path);
+                    var files = folder.GetFiles().Where(file => file.Name.StartsWith("TRIMWorkgroup") && file.LastWriteTime < last && file.Extension == ".log");
+                    if (!String.IsNullOrEmpty(time))
                     {
-                        String logLines = sr.ReadToEnd();
-                        Regex pattern = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<UnknownField>\d+)\s+(?<UnknownField2>\d+)\s+(?<LogLevel>\w+):\s+(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
-                        List<LogEntry> logEntries = new List<LogEntry>();
-                        var matches = pattern.Matches(logLines);
-                        foreach (Match match in matches)
-                        {
-                            LogEntry logEntry = new LogEntry
-                            {
-                                Timestamp = DateTime.ParseExact(file.CreationTime.ToString("yyyy-MM-dd") + " " + match.Groups["Timestamp"].Value, "yyyy-MM-dd HH:mm:ss:fff", CultureInfo.InvariantCulture),
-                                Dataset = match.Groups["Dataset"].Value,
-                                ThreadId = match.Groups["ThreadId"].Value,
-                                LogLevel = match.Groups["LogLevel"].Value,
-                                ErrorMessage = match.Groups["ErrorMessage"].Value
-                            };
-                            if (logEntry.LogLevel == "Error")
-                            {
-                                if (!String.IsNullOrEmpty(time))
-                                {
-                                    DateTime lastupdated = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
-                                    if (logEntry.Timestamp < lastupdated)
-                                    {
-                                        continue;
-                                    }
-                                }
-                                logEntries.Add(logEntry);
-                            }
-                        }
-                        lock (dtLock)
-                        {
-                            foreach (var entry in logEntries)
-                            {
-                                log.Info($" Timestamp = {file.LastWriteTime.ToString("yyyy-MM-dd") + " " + entry.Timestamp.ToString("HH:mm:ss,fff")}, Dataset = \"{entry.Dataset}\", ThreadId = {entry.ThreadId}, LogLevel = \"{entry.LogLevel}\", ErrorMessage = \"{entry.ErrorMessage.Trim()}\"");
-                                String[] row = { entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), Environment, WGS, entry.Dataset, entry.ThreadId, entry.LogLevel, entry.ErrorMessage.Trim() };
-                                lock (rowsLock)
-                                {
-                                    rows.Add(row);
-                                }
-                                int flag = 0;
-                                for (int i = 0; i < dt.Rows.Count; i++)
-                                {
-                                    if (dt.Rows[i][2].ToString() == entry.ErrorMessage.Trim())
-                                    {
-                                        DateTime first = DateTime.ParseExact(dt.Rows[i][0] + "", "dd-MM-yyyy HH:mm:ss.fff", CultureInfo.InvariantCulture);
-                                        if (first > entry.Timestamp)
-                                        {
-                                            dt.Rows[i][0] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
-                                        }
-                                        else
-                                        {
-                                            dt.Rows[i][1] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
-                                        }
-                                        int count = int.Parse(dt.Rows[i][3] + "");
-                                        dt.Rows[i][3] = count + 1;
-                                        flag = 1;
-                                        break;
-                                    }
-                                }
-                                if (flag == 0)
-                                {
-                                    dt.Rows.Add(entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.ErrorMessage.Trim(), 1);
-                                }
-                            }
-                        }
+                        last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                        files = folder.GetFiles().Where(file => file.Name.StartsWith("TRIMWorkgroup") && file.LastWriteTime > last && file.Extension == ".log");
                     }
-                });
-                String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
-                msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
-                UpdateXML(Service, Environment, WGS, rows, dt);
+                    object dtLock = new object();
+                    object rowsLock = new object();
+                    Parallel.ForEach(files, file =>
+                    {
+                        using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                        {
+                            String logLines = sr.ReadToEnd();
+                            Regex pattern = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<UnknownField>\d+)\s+(?<UnknownField2>\d+)\s+(?<LogLevel>\w+):\s+(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+                            List<LogEntry> logEntries = new List<LogEntry>();
+                            var matches = pattern.Matches(logLines);
+                            foreach (Match match in matches)
+                            {
+                                LogEntry logEntry = new LogEntry
+                                {
+                                    Timestamp = DateTime.ParseExact(file.CreationTime.ToString("yyyy-MM-dd") + " " + match.Groups["Timestamp"].Value, "yyyy-MM-dd HH:mm:ss:fff", CultureInfo.InvariantCulture),
+                                    Dataset = match.Groups["Dataset"].Value,
+                                    ThreadId = match.Groups["ThreadId"].Value,
+                                    LogLevel = match.Groups["LogLevel"].Value,
+                                    ErrorMessage = match.Groups["ErrorMessage"].Value
+                                };
+                                if (logEntry.LogLevel == "Error")
+                                {
+                                    if (!String.IsNullOrEmpty(time))
+                                    {
+                                        DateTime lastupdated = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                                        if (logEntry.Timestamp < lastupdated)
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                    logEntries.Add(logEntry);
+                                }
+                            }
+                            lock (dtLock)
+                            {
+                                foreach (var entry in logEntries)
+                                {
+                                    log.Info(" Timestamp = " + file.LastWriteTime.ToString("yyyy-MM-dd") + " " + entry.Timestamp.ToString("HH:mm:ss,fff") + ", Dataset = " + entry.Dataset + ", ThreadId = " + entry.ThreadId + ", LogLevel = " + entry.LogLevel + ", ErrorMessage = " + entry.ErrorMessage.Trim());
+                                    String[] row = { entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), Environment, WGS, entry.Dataset, entry.ThreadId, entry.LogLevel, entry.ErrorMessage.Trim() };
+                                    lock (rowsLock)
+                                    {
+                                        rows.Add(row);
+                                    }
+                                    int flag = 0;
+                                    for (int i = 0; i < dt.Rows.Count; i++)
+                                    {
+                                        if (dt.Rows[i][2].ToString() == entry.ErrorMessage.Trim())
+                                        {
+                                            DateTime first = DateTime.ParseExact(dt.Rows[i][0] + "", "dd-MM-yyyy HH:mm:ss.fff", CultureInfo.InvariantCulture);
+                                            if (first > entry.Timestamp)
+                                            {
+                                                dt.Rows[i][0] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
+                                            }
+                                            else
+                                            {
+                                                dt.Rows[i][1] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
+                                            }
+                                            int count = int.Parse(dt.Rows[i][3] + "");
+                                            dt.Rows[i][3] = count + 1;
+                                            flag = 1;
+                                            break;
+                                        }
+                                    }
+                                    if (flag == 0)
+                                    {
+                                        dt.Rows.Add(entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.ErrorMessage.Trim(), 1);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
+                    msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
+                    UpdateXML(Service, Environment, WGS, rows, dt);
+                }
             }
             catch (Exception ex)
             {
@@ -596,7 +608,7 @@ namespace XML_Parse
                 {
                     if (entry.Source.Equals(sourceName, StringComparison.OrdinalIgnoreCase) && entry.EntryType == EventLogEntryType.Error && entry.TimeGenerated >= lastdate)
                     {
-                        log.Info($"Event ID : " + entry.InstanceId + "\t Entry Type: " + entry.EntryType + "\t Source : " + entry.Source + "\t Message: " + entry.Message.Replace("\r\n", " : ") + "\t Time Generated: " + entry.TimeGenerated);
+                        log.Info("Event ID : " + entry.InstanceId + "\t Entry Type: " + entry.EntryType + "\t Source : " + entry.Source + "\t Message: " + entry.Message.Replace("\r\n", " : ") + "\t Time Generated: " + entry.TimeGenerated);
                         String[] row = { entry.TimeGenerated.ToString("dd-MM-yyyy HH:mm:ss.fff"), "Event Viewer", "", entry.Source, entry.InstanceId + "", entry.EntryType + "", entry.Message.Replace("\r\n", " : ") };
                         lock (rowsLock)
                         {
@@ -652,87 +664,90 @@ namespace XML_Parse
                 DataTable dt = InitializeDataTable();
                 List<String[]> rows = new List<String[]>();
                 DateTime last = DateTime.Now;
-                DirectoryInfo folder = new DirectoryInfo(path);
-                var files = folder.GetFiles().Where(file => file.LastWriteTime < last);
-                if (!String.IsNullOrEmpty(time))
+                if (Directory.Exists(path))
                 {
-                    last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
-                    files = folder.GetFiles().Where(file => file.LastWriteTime > last);
-                }
-                object dtLock = new object();
-                object rowsLock = new object();
-                Parallel.ForEach(files, file =>
-                {
-                    using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                    DirectoryInfo folder = new DirectoryInfo(path);
+                    var files = folder.GetFiles().Where(file => file.LastWriteTime < last);
+                    if (!String.IsNullOrEmpty(time))
                     {
-                        String logLines = sr.ReadToEnd();
-                        Regex pattern = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<LogLevel>--|-\w+-|-\w+-|\*)\s+(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
-                        List<LogEntry> logEntries = new List<LogEntry>();
-                        var matches = pattern.Matches(logLines);
-                        foreach (Match match in matches)
-                        {
-                            LogEntry logEntry = new LogEntry
-                            {
-                                Timestamp = DateTime.ParseExact(file.CreationTime.ToString("yyyy-MM-dd") + " " + match.Groups["Timestamp"].Value, "yyyy-MM-dd HH:mm:ss:fff", CultureInfo.InvariantCulture),
-                                ThreadId = match.Groups["ThreadId"].Value,
-                                LogLevel = match.Groups["LogLevel"].Value,
-                                ErrorMessage = match.Groups["ErrorMessage"].Value
-                            };
-                            if (logEntry.ErrorMessage.StartsWith("Failed"))
-                            {
-                                if (!String.IsNullOrEmpty(time))
-                                {
-                                    DateTime lastupdated = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
-                                    if (logEntry.Timestamp < lastupdated)
-                                    {
-                                        continue;
-                                    }
-                                }
-                                logEntries.Add(logEntry);
-                            }
-                        }
-                        foreach (var entry in logEntries)
-                        {
-                            log.Info($" Timestamp = {file.LastWriteTime.ToString("yyyy-MM-dd") + " " + entry.Timestamp.ToString("HH:mm:ss,fff")}, Dataset = \"{entry.Dataset}\", ThreadId = {entry.ThreadId}, LogLevel = \"{entry.LogLevel}\", ErrorMessage = \"{entry.ErrorMessage.Trim()}\"");
-                            String[] row = { entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), Environment, WGS, entry.Dataset, entry.ThreadId, entry.LogLevel, entry.ErrorMessage.Trim() };
-                            lock (rowsLock)
-                            {
-                                rows.Add(row);
-                            }
-                            lock (dtLock)
-                            {
-                                int flag = 0;
-                                for (int i = 0; i < dt.Rows.Count; i++)
-                                {
-                                    if (dt.Rows[i][2].ToString() == entry.ErrorMessage.Trim())
-                                    {
-                                        DateTime first = DateTime.ParseExact(dt.Rows[i][0].ToString(), "dd-MM-yyyy HH:mm:ss.fff", CultureInfo.InvariantCulture);
-                                        if (first > entry.Timestamp)
-                                        {
-                                            dt.Rows[i][0] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
-                                        }
-                                        else
-                                        {
-                                            dt.Rows[i][1] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
-                                        }
-                                        int count = int.Parse(dt.Rows[i][3].ToString());
-                                        dt.Rows[i][3] = count + 1;
-                                        flag = 1;
-                                        break;
-                                    }
-                                }
-                                if (flag == 0)
-                                {
-                                    dt.Rows.Add(entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.ErrorMessage.Trim(), 1);
-                                }
-                            }
-                        }
+                        last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                        files = folder.GetFiles().Where(file => file.LastWriteTime > last);
                     }
-                });
-                String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
-                msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
-                UpdateXML(Service, Environment, WGS, rows, dt);
+                    object dtLock = new object();
+                    object rowsLock = new object();
+                    Parallel.ForEach(files, file =>
+                    {
+                        using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                        {
+                            String logLines = sr.ReadToEnd();
+                            Regex pattern = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<LogLevel>--|-\w+-|-\w+-|\*)\s+(?<ErrorMessage>.+)$", RegexOptions.Multiline | RegexOptions.Compiled);
+                            List<LogEntry> logEntries = new List<LogEntry>();
+                            var matches = pattern.Matches(logLines);
+                            foreach (Match match in matches)
+                            {
+                                LogEntry logEntry = new LogEntry
+                                {
+                                    Timestamp = DateTime.ParseExact(file.CreationTime.ToString("yyyy-MM-dd") + " " + match.Groups["Timestamp"].Value, "yyyy-MM-dd HH:mm:ss:fff", CultureInfo.InvariantCulture),
+                                    ThreadId = match.Groups["ThreadId"].Value,
+                                    LogLevel = match.Groups["LogLevel"].Value,
+                                    ErrorMessage = match.Groups["ErrorMessage"].Value
+                                };
+                                if (logEntry.ErrorMessage.StartsWith("Failed"))
+                                {
+                                    if (!String.IsNullOrEmpty(time))
+                                    {
+                                        DateTime lastupdated = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                                        if (logEntry.Timestamp < lastupdated)
+                                        {
+                                            continue;
+                                        }
+                                    }
+                                    logEntries.Add(logEntry);
+                                }
+                            }
+                            foreach (var entry in logEntries)
+                            {
+                                log.Info(" Timestamp = " + file.LastWriteTime.ToString("yyyy-MM-dd") + " " + entry.Timestamp.ToString("HH:mm:ss,fff") + ", Dataset = " + entry.Dataset + ", ThreadId = " + entry.ThreadId + ", LogLevel = " + entry.LogLevel + ", ErrorMessage = " + entry.ErrorMessage.Trim());
+                                String[] row = { entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), Environment, WGS, entry.Dataset, entry.ThreadId, entry.LogLevel, entry.ErrorMessage.Trim() };
+                                lock (rowsLock)
+                                {
+                                    rows.Add(row);
+                                }
+                                lock (dtLock)
+                                {
+                                    int flag = 0;
+                                    for (int i = 0; i < dt.Rows.Count; i++)
+                                    {
+                                        if (dt.Rows[i][2].ToString() == entry.ErrorMessage.Trim())
+                                        {
+                                            DateTime first = DateTime.ParseExact(dt.Rows[i][0].ToString(), "dd-MM-yyyy HH:mm:ss.fff", CultureInfo.InvariantCulture);
+                                            if (first > entry.Timestamp)
+                                            {
+                                                dt.Rows[i][0] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
+                                            }
+                                            else
+                                            {
+                                                dt.Rows[i][1] = entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff");
+                                            }
+                                            int count = int.Parse(dt.Rows[i][3].ToString());
+                                            dt.Rows[i][3] = count + 1;
+                                            flag = 1;
+                                            break;
+                                        }
+                                    }
+                                    if (flag == 0)
+                                    {
+                                        dt.Rows.Add(entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.Timestamp.ToString("dd-MM-yyyy HH:mm:ss.fff"), entry.ErrorMessage.Trim(), 1);
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
+                    msgBuilder.Append("\n<td>" + Service + "</td>\n<td>" + Service + "</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + last.ToString("yyyy-MM-dd HH:mm:ss,fff") + "</td>\n</tr>\n<tr>");
+                    UpdateXML(Service, Environment, WGS, rows, dt);
+                }
             }
             catch (Exception ex)
             {
@@ -745,37 +760,40 @@ namespace XML_Parse
             try
             {
                 DateTime last = DateTime.Now;
-                DirectoryInfo folder = new DirectoryInfo(LogPath);
-                var files = folder.GetFiles().Where(file => file.LastWriteTime < last && file.Name.StartsWith("TRIMEvent_" + Dataset + "_"));
-                if (!String.IsNullOrEmpty(time))
+                if (Directory.Exists(LogPath))
                 {
-                    last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
-                    files = folder.GetFiles().Where(file => file.LastWriteTime > last && file.Name.StartsWith("TRIMEvent_" + Dataset + "_"));
-                }
-                var eventEntries = new ConcurrentDictionary<String, EventEntry>();
-                Regex addedRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+)(: \(workgroup notification\)) : Received (?<Count>\d+).+$", RegexOptions.Multiline | RegexOptions.Compiled);
-                Regex processedRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+):\s+(?<Data>processing event: \d+, eventtype =\d+, bobtype=\d+, boburi=\d+, event processed immediatel).+$", RegexOptions.Multiline | RegexOptions.Compiled);
-                Regex processedBufferRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+):\s+(?<Data>processing )(?<Count>\d+)(?<Buffer> buffered event).+$", RegexOptions.Multiline | RegexOptions.Compiled);
-                Parallel.ForEach(files, file =>
-                {
-                    using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                    DirectoryInfo folder = new DirectoryInfo(LogPath);
+                    var files = folder.GetFiles().Where(file => file.LastWriteTime < last && file.Name.StartsWith("TRIMEvent_" + Dataset + "_"));
+                    if (!String.IsNullOrEmpty(time))
                     {
-                        String logLines = sr.ReadToEnd();
-                        ProcessLogLines(logLines, addedRegex, eventEntries, "Total", match => Convert.ToInt32(match.Groups["Count"].Value));
-                        ProcessLogLines(logLines, processedRegex, eventEntries, "Processed", match => 1);
-                        ProcessLogLines(logLines, processedBufferRegex, eventEntries, "Processed", match => Convert.ToInt32(match.Groups["Count"].Value));
+                        last = DateTime.ParseExact(time, "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
+                        files = folder.GetFiles().Where(file => file.LastWriteTime > last && file.Name.StartsWith("TRIMEvent_" + Dataset + "_"));
                     }
-                });
-                msgBuilder.Append("\n<tr>\n<td rowspan=\"" + eventEntries.Count + "\">" + Dataset + "</td>");
-                foreach (var entry in eventEntries.Values)
-                {
-                    msgBuilder.Append("\n<td>" + entry.Event + "</td>\n<td>" + entry.Total + "</td>\n<td>" + entry.Processed + "</td>\n<td>" + (entry.Total - entry.Processed) + "</td>\n</tr>");
+                    var eventEntries = new ConcurrentDictionary<String, EventEntry>();
+                    Regex addedRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+)(: \(workgroup notification\)) : Received (?<Count>\d+).+$", RegexOptions.Multiline | RegexOptions.Compiled);
+                    Regex processedRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+):\s+(?<Data>processing event: \d+, eventtype =\d+, bobtype=\d+, boburi=\d+, event processed immediatel).+$", RegexOptions.Multiline | RegexOptions.Compiled);
+                    Regex processedBufferRegex = new Regex(@"^(?<Timestamp>\d{2}:\d{2}:\d{2}:\d{3})\s+(?<ThreadId>\d+)\s+(?<Dataset>\w+)\s+(?<Event>.+):\s+(?<Data>processing )(?<Count>\d+)(?<Buffer> buffered event).+$", RegexOptions.Multiline | RegexOptions.Compiled);
+                    Parallel.ForEach(files, file =>
+                    {
+                        using (FileStream fs = new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (StreamReader sr = new StreamReader(fs, Encoding.Default))
+                        {
+                            String logLines = sr.ReadToEnd();
+                            ProcessLogLines(logLines, addedRegex, eventEntries, "Total", match => Convert.ToInt32(match.Groups["Count"].Value));
+                            ProcessLogLines(logLines, processedRegex, eventEntries, "Processed", match => 1);
+                            ProcessLogLines(logLines, processedBufferRegex, eventEntries, "Processed", match => Convert.ToInt32(match.Groups["Count"].Value));
+                        }
+                    });
+                    msgBuilder.Append("\n<tr>\n<td rowspan=\"" + eventEntries.Count + "\">" + Dataset + "</td>");
+                    foreach (var entry in eventEntries.Values)
+                    {
+                        msgBuilder.Append("\n<td>" + entry.Event + "</td>\n<td>" + entry.Total + "</td>\n<td>" + entry.Processed + "</td>\n<td>" + (entry.Total - entry.Processed) + "</td>\n</tr>");
+                    }
+                    XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
+                    var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("Environments").Elements("Environment").Elements("Datasets").Elements("Dataset").Where(e => e.Attribute("Id").Value == Dataset).Single();
+                    target.Attribute("LastUpdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
+                    xmlDoc.Save("CM_Monitor.xml");
                 }
-                XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
-                var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("Environments").Elements("Environment").Elements("Datasets").Elements("Dataset").Where(e => e.Attribute("Id").Value == Dataset).Single();
-                target.Attribute("LastUpdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
-                xmlDoc.Save("CM_Monitor.xml");
             }
             catch (Exception ex)
             {
@@ -924,7 +942,7 @@ namespace XML_Parse
             {
                 log.Info(Server + " CPU Details :");
                 decimal clockspeed = 0, clockper = 0;
-                ManagementScope scope = new ManagementScope($"\\\\{Server}\\root\\cimv2", GetConnection(Server));
+                ManagementScope scope = new ManagementScope("\\\\" + Server + "\\root\\cimv2", GetConnection(Server));
                 scope.Connect();
                 ObjectQuery query = new ObjectQuery("SELECT CurrentClockSpeed, LoadPercentage FROM Win32_Processor");
                 using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query))
@@ -1019,16 +1037,16 @@ namespace XML_Parse
             {
                 try
                 {
-                    TimeSpan age = DateTime.Now - File.GetCreationTime(file);
+                    TimeSpan age = DateTime.Now - File.GetLastWriteTime(file);
                     if (age.TotalDays > 30)
                     {
                         File.Delete(file);
-                        log.Info($"Deleted: " + file);
+                        Console.WriteLine("Deleted: " + file);
                     }
                 }
                 catch (Exception ex)
                 {
-                    log.Error($"Error deleting file " + file + ": " + ex);
+                    Console.WriteLine("Error deleting file " + file + ": " + ex);
                 }
             }
         }
