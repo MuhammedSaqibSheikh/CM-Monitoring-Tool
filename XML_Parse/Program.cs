@@ -53,7 +53,7 @@ namespace XML_Parse
                 DTServer.Columns.Add("Username");
                 DTServer.Columns.Add("Password");
                 msgBuilder.Append("<style>\n#security \n{width: 99%;border-radius:10px;border-spacing: 0;font-family:'Trebuchet MS', sans-serif;margin-left: auto;margin-right: auto;}\n#security td, #security th \n{border: 1px solid #ddd;padding: 10px;}\n#security tr:nth-child(even)\n{background-color: #f2f2f2;}\n#security th \n{padding-top: 12px;padding-bottom: 12px;text-align: center;background-color: #5F9EA0;color: white;}\n#myDiv\n{border: 2px outset #5F9EA0;text-align: center;}\n</style>\n<body style=\"font-family:'Trebuchet MS', sans-serif;\">\nDear Admin,</br>Below is the summary of Content Manager Monitoring Tool on " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "\n</br></br>");
-                GetCpuDetails();                
+                GetCpuDetails();
                 LoadServerDetails();
                 BuildReport();
                 GenerateEmailReport();
@@ -111,7 +111,14 @@ namespace XML_Parse
                     {
                         lastUpdated = DateTime.ParseExact(servicesNode.GetAttribute("LastUpdated"), "yyyy-MM-dd HH:mm:ss,fff", CultureInfo.InvariantCulture);
                     }
-                    EventViewerLog("Application", servicesNode.GetAttribute("Name"), lastUpdated);
+                    if (String.IsNullOrEmpty(servicesNode.GetAttribute("Server")))
+                    {
+                        EventViewerLog("Application", servicesNode.GetAttribute("Name"), lastUpdated);
+                    }
+                    else
+                    {
+                        EventViewerLog(servicesNode.GetAttribute("Server"), "Application", servicesNode.GetAttribute("Name"), lastUpdated);
+                    }
                 }
             }
             msgBuilder.Length -= 4;
@@ -645,6 +652,77 @@ namespace XML_Parse
                 });
                 String color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
                 msgBuilder.Append("\n<td></td>\n<td></td>\n<td>Event Viewer Logs</td>\n<td>" + sourceName + "</td>\n<td>Windows Event Logs</td>\n<td bgcolor=\"" + color + "\">" + rows.Count + " Errors Found, " + lastdate.ToString("dd-MM-yyyy HH:mm:ss.fff") + "</td>\n</tr>\n<tr>");
+                XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
+                var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("WindowsEvent").Elements("Services").Where(e => e.Attribute("Name").Value == sourceName).Single();
+                target.Attribute("LastUpdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
+                xmlDoc.Save("CM_Monitor.xml");
+                UpdateXML("", "", "", rows, dt);
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex);
+            }
+        }
+
+        public static void EventViewerLog(string server, string logName, string sourceName, DateTime lastdate)
+        {
+            try
+            {
+                DataTable dt = InitializeDataTable();
+                List<String[]> rows = new List<String[]>();
+                object dtLock = new object();
+                object rowsLock = new object();
+                ManagementScope scope = new ManagementScope("\\\\" + server + "\\root\\cimv2", GetConnection(server));
+                scope.Connect();
+                ObjectQuery query = new ObjectQuery("SELECT * FROM Win32_NTLogEvent WHERE Logfile = '" + logName + "' AND SourceName = '" + sourceName + "' AND EventType = 1 AND TimeGenerated >= '" + lastdate.ToString("yyyyMMddHHmmss.000000-000") + "'");
+                ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query);
+                List<String[]> localRows = new List<String[]>();
+                List<(DateTime timeGenerated, string message)> localDataTableUpdates = new List<(DateTime, string)>();
+                Parallel.ForEach(searcher.Get().Cast<ManagementObject>(), mo =>
+                {
+                    DateTime timeGenerated = DateTime.ParseExact(mo["TimeGenerated"].ToString(), "yyyyMMddHHmmss.ffffff-000", CultureInfo.InvariantCulture);
+                    string message = mo["Message"].ToString().Replace("\r\n", " : ");
+                    log.Info("Event ID : " + mo["EventCode"] + "\t Entry Type: " + mo["EventType"] + "\t Source : " + mo["SourceName"] + "\t Message: " + mo["Message"].ToString().Replace("\r\n", " : ") + "\t Time Generated: " + mo["TimeGenerated"]);
+                    string[] row = { timeGenerated.ToString("dd-MM-yyyy HH:mm:ss.fff"), "Event Viewer", "", mo["SourceName"].ToString(), mo["EventCode"].ToString(), mo["EventType"].ToString(), message };
+                    localRows.Add(row);
+                    localDataTableUpdates.Add((timeGenerated, message));
+                });
+                lock (rowsLock)
+                {
+                    rows.AddRange(localRows);
+                }
+                lock (dtLock)
+                {
+                    foreach (var (timeGenerated, message) in localDataTableUpdates)
+                    {
+                        bool exists = false;
+                        for (int i = 0; i < dt.Rows.Count; i++)
+                        {
+                            if (dt.Rows[i][2].ToString() == message)
+                            {
+                                DateTime first = DateTime.ParseExact(dt.Rows[i][0].ToString(), "dd-MM-yyyy HH:mm:ss.fff", CultureInfo.InvariantCulture);
+                                if (first > timeGenerated)
+                                {
+                                    dt.Rows[i][0] = timeGenerated.ToString("dd-MM-yyyy HH:mm:ss.fff");
+                                }
+                                else
+                                {
+                                    dt.Rows[i][1] = timeGenerated.ToString("dd-MM-yyyy HH:mm:ss.fff");
+                                }
+                                int count = int.Parse(dt.Rows[i][3].ToString());
+                                dt.Rows[i][3] = count + 1;
+                                exists = true;
+                                break;
+                            }
+                        }
+                        if (!exists)
+                        {
+                            dt.Rows.Add(timeGenerated.ToString("dd-MM-yyyy HH:mm:ss.fff"), timeGenerated.ToString("dd-MM-yyyy HH:mm:ss.fff"), message, 1);
+                        }
+                    }
+                }
+                string color = rows.Count == 0 ? "MediumSeaGreen" : "Salmon";
+                msgBuilder.Append($"\n<td></td>\n<td></td>\n<td>Event Viewer Logs</td>\n<td>{sourceName}</td>\n<td>Windows Event Logs</td>\n<td bgcolor=\"{color}\">{rows.Count} Errors Found, {lastdate:dd-MM-yyyy HH:mm:ss.fff}</td>\n</tr>\n<tr>");
                 XDocument xmlDoc = XDocument.Load("CM_Monitor.xml");
                 var target = xmlDoc.Elements("Root").Elements("CM_Monitor").Elements("WindowsEvent").Elements("Services").Where(e => e.Attribute("Name").Value == sourceName).Single();
                 target.Attribute("LastUpdated").Value = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss,fff");
